@@ -1,0 +1,441 @@
+---
+title: "R-for-ml"
+autho: "Esther Cuervo Fernández"
+date: "2 Junio, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introducción
+
+En este infome se trata de exploar distintas técnicas de análisis sobre el dataset *student*, disponible en: https://archive.ics.uci.edu/ml/datasets/Student+Academics+Perfomance
+
+Este dataset contiene daas sobre estudiantes de dos asignaturas: Matemáticas y Potugués. Los campos del dataset son los siguientes:
+
+1. **school** - colegio del estudiante (binario: "GP" - Gabriel Pereira o "MS" - Mousinho da Silveira)
+2. **sex** - género del estudiante (binario: "F" - mujer o "M" - hombre)
+3. **age** - edad del estudiante (numérico: de 15 a 22)
+4. **address** - tipo de dirección del estudiante (binario: "U" - urbano o "R" - rural)
+5. **famsize** - tamaño de familia (binario: "LE3" - menor o igaul a 3 o "GT3" - más de 3)
+6. **Pstatus** - estado de cohabitación de los padres (binario: "T" - viviendo juntos o "A" - separados)
+7. **Medu** - educación de la madre (numérico: 0 - ninguna,  1 - educación primaria (4o), 2 – 5o a 9o, 3 – educación secundaria o 4 – educación superior)
+8. **Fedu** - educación del padre (numérico: 0 - ninguna,  1 - educación primaria (4o), 2 – 5o a 9o, 3 – educación secundaria o 4 – educación superior)
+9. **Mjob** - trabajo de la madre (nominal: "teacher" - profesor, "health" - salud, "services" - funcionario, "at_home" - am@ de casa o "other" - otro)
+10. **Fjob** - trabajo del padre (nominal: "teacher" - profesor, "health" - salud, "services" - funcionario, "at_home" - am@ de casa o "other" - otro)
+11. **reason** - razón por la que eligieron el colegio (nominal: "home" - cerca de casa, "reputation" - reputación del colegio, "course" - preferencia de curso o "other" - otro)
+12. **guardian** - tutor legal del estudiante (nominal: "mother" - madre, "father" - padre o "other" - otro)
+13. **traveltime** - tiempo de viaje entre casa y el colegio (numérico: 1 - <15 min., 2 - 15 a 30 min., 3 - 30 min. a 1 hour, o 4 - >1 hour)
+14. **studytime** - tiempo de estudio semanal (numérico: 1 - <2 horas, 2 - 2 a 5 horas, 3 - 5 a 10 horas, o 4 - >10 horas)
+15. **failures** - número de clases suspensas anteriores (numérico: n si 1<=n<3, si no 4)
+16. **schoolsup** - ayuda extra curricular (binario: yes o no)
+17. **famsup** - ayuda familiar (binario: yes o no)
+18. **paid** - clases extra pagadas en la asignatura del curso (matemáticas o portugués)) (binario: yes o no)
+19. **activities** - actividades extra-curriculares (binario: yes o no)
+20. **nursery** - fue a guardería (binario: yes o no)
+21. **higher** - quiere educación superior (binario: yes o no)
+22. **internet** - acceso a Internet en casa (binario: yes o no)
+23. **romantic** - en una relación romántica (binario: yes o no)
+24. **famrel** - calidad de relaciones familiares (numérico: de 1 - muy mala a 5 - excelente)
+25. **freetime** - tiempo libre después de clase (numérico: de 1 - muy bajo a 5 - muy alto)
+26. **goout** - sale con amigos (numérico: de 1 - muy bajo a 5 - muy alto)
+27. **Dalc** - consumo de alcohol durante semana (numérico: de 1 - muy bajo a 5 - muy alto)
+28. **Walc** - consumo de alcohol durante fines de semana (numérico: de 1 - muy bajo a 5 - muy alto)
+29. **health** - estado de salud actual (numérico: de 1 - muy malo a 5 - muy bueno)
+30. **absences** - número de ausencias (numérico: de 0 a 93)
+
+31. **G1** - nota del primer periodo (numérico: de 0 a 20)
+32. **G2** - nota del segundo periodo (numérico: de 0 a 20)
+33. **G3** - nota final (numérico: de 0 a 20)
+
+El fichero de descripción también destaca que hay ciertos alumnos (382) que están presentes en los datasets para ambas asignaturas.
+
+Nuestro objetivo va a ser clasificar a los alumnos como aprobados o suspensos, considerando aprobado como G3>=10 y suspenso G3<10. Para ello vamos a utilizar el dataset que contiene información sobre la clase de matemáticas.
+
+### Lectura de datos
+
+Creamos un directorio para los datos y los leemos directamente de la url proporcionada
+
+```{r descarga, echo=TRUE}
+
+if (!file.exists("./data")) {
+        dir.create("./data")
+}
+
+fileURL <- "https://archive.ics.uci.edu/ml/machine-learning-databases/00320/student.zip"
+download.file(fileURL,destfile="./data/student.zip",method="curl")
+unzip("./data/student.zip", exdir="./data")
+list.files("./data")
+
+```
+
+Los datos están formados por dos tablas, una para cada asignatura. Nos quedamos con la de matemáticas:
+
+```{r lectura, echo=TRUE}
+math=read.table("./data/student-mat.csv",sep=";",header=TRUE)
+```
+
+Creamos la variable a predecir, `pass`, binaria - "yes" para aprobados y "no" para suspensos:
+
+```{r pass, echo=TRUE}
+math$pass <- ifelse(math$G3>=10, "yes", "no")
+```
+
+## Summary
+
+Estadísticas para la variable original G3:
+
+```{r summary, echo=TRUE}
+summary(math$G3)
+```
+
+Podemos ver que existen notas tanto iguales a 0 como a 20. Los cuartiles también aportan información, por ejemplo que han aprobado algo más de un 50% de alumnos.
+
+### Exploración de variables
+
+Exploramos algunas posibles relaciones entre variables así como con la variable a predecir, `pass`. Por ejemplo `school` y `reason`:
+
+```{r schoolvreason, result=FALSE}
+library(ggplot2)
+
+ggplot(math,mapping=aes(x=school,fill=school)) +
+  geom_bar(show.legend = FALSE) +
+  ggtitle("Fig 1.1: Número de alumnos por colegio") +
+  ylab("número alumnos")
+
+ggplot(math,mapping=aes(x=school, fill=pass)) +
+  geom_bar(position = "fill") + 
+  ggtitle("Fig 1.2: Distribución de aprobados por colegio") +
+  ylab("% alumnos")
+
+ggplot(math,mapping=aes(x=school, fill=reason)) +
+  facet_wrap(~pass) +
+  geom_bar(position = "fill") +
+  ggtitle("Fig 1.3: Distribución de razón por colegio y aprobado") +
+  ylab("% alumnos")
+```
+
+- La Fig 1.1. nos permite observar que el número de alumnos en el colegio `MS` es muy inferior al de alumnos en `GP`.
+- La Fig 1.2. nos muestra que el porcentaje de aprobados es muy similar en ambos colegios, por lo que, aunque `MS` parece ser algo más difícil, no parece haber una diferencia significativa.
+- La Fig 1.3. muestra las razones de elección del colegio por colegio y resultado. En el caso de los alumnos suspensos se ve un porcentaje significativamente alto de elección por causa `course`, mientras que a los alumnos aprobados parece importarles más la reputación en el caso del colegio `GP` y other en `MS`. En ambos casos parece que `GP` es más prestigioso.
+
+Otra relación interesante puede ser la de `G1` y `G2`, las notas del primer y segundo periodo:
+
+```{r G1vG2, result=FALSE}
+ggplot(math) +
+  geom_jitter(mapping=aes(x=G1, y=G2, color=pass),alpha=0.5) + 
+  ggtitle("Fig 2: Nota del Periodo 2 contra Nota del Periodo 1 y aprobado") +
+  xlab("Nota del Periodo 1") + 
+  ylab("Nota del Periodo 2")
+```
+
+Se pueden ver unos puntos que siguen una relación lineal, como era esperado, pero también algunos puntos que tienen valor de `G2` igual a 0, con valores de `G1` distribuidos. Podemos obtener a estos alumnos mediante un filtro:
+
+```{r students with G2 0, result=FALSE}
+library(dplyr)
+library(knitr)
+
+g2strange <- dplyr::filter(math,G2 == 0, G1 > 0)
+
+kable(select(g2strange,"school","reason","age","higher","failures","traveltime","G1","G2","G3","pass"))
+```
+
+Se puede observar que todos los alumnos son del mismo colegio, y que todos han obtenido una nota de 0 en `G3`. Especialmente curiosos son los alumnos que tenían notas de aprobado en `G2`. Una posible explicación son alumnos que han abandonado la clase antes del final del segundo periodo, y si el sistema educativo del país de origen de los datos es obligatorio sólo hasta la mayoría de edad, esto podría significar un abandono en el caso de los dos alumnos que no desean una educación superior, y ya tienen más de 18 años. También se puede observar que algunos de los alumnos tienen un número alto de suspensos anteriores.
+
+En cualquier caso estos valores podrían ser outliers.
+
+Otra variable que puede tener mucha relación con la nota final es el número de ausencias, `abscences` y el número de suspensos anteriores `failures`:
+
+```{r failuresvg3, ECHO=FALSE}
+
+ggplot(math) + 
+  geom_jitter(mapping = aes(x=failures, y=absences),alpha=0.5) +
+  facet_wrap(~factor(pass,labels=c("no","yes"))) + 
+  xlab("supensos anteriores") + ylab("num ausencias") +
+  ggtitle("Fig 3. Relación entre suspensos anteriores y número de ausencias por aprobado")
+
+``` 
+
+Dentro de los no aprobados podemos ver un número alto de suspensos anteriores, aunque no se aprecia que la cantidad de ausencias sea especialmente mayor que en los aprobados. Existen algunos posibles outliers con más de 40 ausencias.
+
+Otras variables como consumo de alcohol durante semana `Dalc` y fines de semana `Walc` puede tener relación con la nota.
+
+```{r alc, ECHO=FALSE}
+
+  ggplot(math) + 
+  geom_bar(mapping = aes(x=Walc, fill=pass),position="dodge") +
+  ggtitle("Fig 4.1. Alumnos por aprobado y alcohol consumido en fines de semana") +
+  ylab("Número de alumnos") + xlab("Alcohol consumido en fines de semana")
+
+  ggplot(math) + 
+  geom_bar(mapping = aes(x=Dalc, fill=pass),position="dodge") +
+  ggtitle("Fig 4.2. Alumnos por aprobado y alcohol consumido entre semana") +
+  ylab("Número de alumnos") + xlab("Alcohol consumido entre semana")
+
+  ggplot(math) +
+    
+  geom_jitter(mapping = aes(x=Dalc, y=Walc,color=pass), alpha=0.5) +
+  ggtitle("Fig 4.3. Relación entre consumo de alcohol 
+          en fines de semana y entre semana y nota") + xlab("Alcohol consumido entre semana") +
+    ylab("Alcohol consumido en fines de semana")
+
+``` 
+
+- La Fig 4.1. nos indica que la mayoría de alumnos tanto suspensos como aprobados consumen muy poco alcohol durante fines de semana, aunque aún así existe una cantidad importante de ellos que consumen alcohol.
+- La Fig 4.2. indica unos números mucho más bajos de consumo de alcohol entre semana, e incluso muestra que con consumos altos el número de suspensos supera a los aprobados, aunque con valores tan pequeños de muestra no se pueden hacer suposiciones.
+- La Fig 4.3. muestra cierta relación entre consumir alcohol entre semana y en fines de semana, aunque es mayormente unilateral: los alumnos que consumen mucho alcohol entre semana tienden a consumir también mucho los fines de semana. 
+
+Otra posible relación es entre el tiempo de estudio y la nota:
+
+```{r studytime, ECHO=FALSE}
+
+  ggplot(math) + 
+  geom_bar( mapping = aes(x=factor(studytime),fill=pass), position = "fill") +
+  ggtitle("Fig 5. Porcentaje de alumnos aprobados por tiempo de estudio") +
+  xlab("Tiempo de estudio") + ylab("% de alumnos")
+
+``` 
+
+Si que es posible apreciar cierto aumento del porcentaje de alumnos aprobados en horas de estudio más altas, aunque este aumento sólo se aprecia por encima de las 5 horas de estudio.
+
+También se pueden explorar algunas variables relacionadas con las familias de los alumnos, `famsize`, `Pstatus`, `Mjob`, `Fjob`, y `famrel`:
+
+```{r families, result=FALSE}
+library(ggplot2)
+
+ggplot(math,mapping=aes(x=pass,fill=pass)) +
+  geom_bar() +
+  facet_grid(famsize ~ famrel, labeller = label_both) +
+  ggtitle("Fig 6.1. Número de alumnos aprobados y suspensos por tamaño de familiia y relación con la familia")
+
+ggplot(math,mapping=aes(x=pass,fill=factor(Mjob))) +
+  geom_bar(position="dodge") +
+  ggtitle("Fig 6.2. Trabajo de la madre por aprobado y suspenso")
+
+ggplot(math,mapping=aes(x=pass,fill=factor(Fjob))) +
+  geom_bar(position="dodge") +
+  ggtitle("Fig 6.3. Trabajo del padre por aprobado y suspenso")
+
+ggplot(math,mapping=aes(x=Pstatus,fill=pass)) +
+  geom_bar(position="dodge") +
+  ggtitle("Fig 6.4. Aprobados y suspensos por situación de los padres")
+
+
+```
+
+- Fig 6.1. muestra que las familias de más de tres miembros son mucho más comunes, y que las relaciones de clidad 4 (buenas) son más comunes en ambos tamaños. 
+- Fig 6.2. y 6.3. muestran que los trabajos más comunes son `other`, podría ser interesante  ver el desglose de estos trabajos. 
+- En la Fig 6.4. se aprecia que lo más común son padres juntos, y no se observa una diferencia grande de distribución de aprobados por esta variable.
+
+También se exploran variables relacionadas con la ayuda al alumno, tanto por parte de la escuela `schoolsup`, como su familia `famsup`, como clases extraescolares `paid`:
+
+```{r support, result=FALSE}
+library(ggplot2)
+
+ggplot(math,mapping=aes(x=pass,fill=pass)) +
+  geom_bar() +
+  facet_grid(schoolsup ~ famsup, labeller = label_both) +
+  ggtitle("Fig 7.1. Número de aprobados y suspensos por ayuda familiar y escolar")
+
+ggplot(math,mapping=aes(x=paid,fill=pass)) +
+  geom_bar(position="dodge") +
+  ggtitle("Fig 7.2. Aprobados y suspensos por asistencia a clases particulares o no")
+
+
+```
+
+- Fig 7.1. muestra que muy pocos alumnos reciben ayuda del colegio, y entre aquellos que la reciben no parece afectar al resultado. Respecto a la ayuda familiar, la mayoría de alumnos la tienen, pero tampoco parece resultar en una clara diferencia en aprobados.
+- En Fig 7.2. se observa que las clases particulares si que parecen reducir el número de suspensos.
+
+Respecto a las variables relacionadas con la vida social de los alumnos con sus notas, existen las variables `romantic`, `goout` y `activities`:
+
+
+```{r social, result=FALSE}
+library(ggplot2)
+
+ggplot(math) +
+  geom_bar( mapping=aes(x=goout, fill=pass ), position="dodge") +
+  ggtitle("Fig 8.1. Número de alumnos aprobados y suspensos 
+          por la frecuencia con la que salen con amigos")
+
+ggplot(math,mapping=aes(x=romantic,fill=pass)) +
+  geom_bar(position="dodge") +
+  ggtitle("Fig 8.2. Número de aprobados y suspensos según si el alumno tiene pareja")
+
+ggplot(math,mapping=aes(x=activities,fill=pass)) +
+  geom_bar(position="dodge") +
+  ggtitle("Fig 8.3. Número de aprobados y suspensos por participación 
+          en actividades extracurriculares")
+
+```
+
+- Fig 8.1. Muestra que, mientras que la mayoría de alumnos salen con una frecuencia normal, frecuencias por encima parecen reducir en gran medida el número de aprobados.
+- Fig 8.2. Muestra que la mayoría de alumnos no tienen pareja, pero que dentro de los que tienen pareja el número de aprobados es muy bajo, comparado con los alumnos sin pareja.
+- Por el contrario Fig 8.3. mustra que las actividades extracurriculares no parecen incidir en los resultados del alumno.
+
+Por último, se exploran otras variables, si la dirección en la que vive el alumno es rural o urbana `address` y si tiene acceso a `internet`:
+
+```{r house, result=FALSE}
+library(ggplot2)
+
+ggplot(math,mapping=aes(x=internet,fill=pass)) + facet_wrap(~address) +
+  geom_bar() +
+  ggtitle("Fig 9.1. Número de aprobados y suspensos según si el alumno tiene 
+          acceso a internet y zona")
+
+ggplot(math,mapping=aes(x=internet,fill=pass)) +
+  geom_bar(position="fill") +
+  ggtitle("Fig 9.2. Proporción de aprobados y suspensos según si tiene acceso a internet") +
+  ylab("% alumnos")
+```
+
+- Fig 9.1. muestra que en zonas rurales la proporción de alumnos que no tienen acceso a internet es alta, mientras que en zonas urbanas es muy pequeña.
+- En Fig 9.2. se puede apreciar cierto aumento en la proporción de alunmos suspensos cuando no tienen acceso a internet, aunque como se ha visto en la anterior figura, la mayoría de alumnos tienen acceso a internet, por lo que estos resultados pueden ser engañosos.
+
+
+## Modelos no supervisados
+
+Eliminamos las variables `pass` y `G3`, ya que estos modelos serán no supervisados. También eliminamos los NaN:
+
+```{r transform, echo=FALSE}
+  x <- select(math, -pass, -G3)
+```
+
+La biblioteca `cluster` proporciona varios tipos de clustering. Probamos `clara`, que divide en k clusters y es útil para datasets grandes. 
+
+```{r clara, echo=FALSE}
+library(cluster)
+
+clusters <- clara(x, 2, samples = 100)
+
+clusters$clusinfo
+math$cluster <- clusters$clustering
+
+```
+
+Podemos comprobar si la separación en clusters se parece a las clases asignadas:
+
+```{r clara2, echo=FALSE}
+
+library(caret)
+
+truth1 <- factor(math$pass,levels=c("yes","no"))
+pred1 <- factor(math$cluster,labels=c("yes","no"))
+
+xtab1 <- table(pred1,truth1)
+
+confusionMatrix(xtab1)
+
+```
+
+Como podemos ver, casi un 60% de las instancias se clasifican correctamente simplemente utilizando clustering. Podemos representar los clusters contra la nota `G3`, para ver si existe alguna relación:
+
+```{r clustersvg3, echo=FALSE}
+
+ggplot(math) + 
+  geom_jitter(mapping=aes(x=cluster,y=G3,color=factor(pass)))
+```
+
+No se observa relación, aunque es interesante ver cómo todos los alumnos con nota final 0 están en el mismo cluster. Tratamos de crear 3 clústers, para ver si esos datos se separan completamente:
+
+```{r clara3, echo=FALSE}
+library(cluster)
+
+clusters <- clara(x, 3, samples = 100)
+
+clusters$clusinfo
+math$cluster2 <- clusters$clustering
+
+```
+
+```{r clustersvg2, echo=FALSE}
+
+ggplot(math) + 
+  geom_jitter(mapping=aes(x=cluster2,y=G3,color=factor(pass)))
+```
+
+No se ha conseguido separar los valores con G3=0 (de hecho, uno de ellos ha pasado al clúster 3), pero se puede apreciar cierta separación entre los tres clústers, con los alumnos en el clúster 1 teniendo notas bajas, casi todas suspensos, y el clúster 3 notas casi todas por encima de 10, excepto por el 0 anteriormente detectado. Por tanto, con 3 clústers, este modelo ya tiene cierta capacidad predictiva de la variable aprobado.
+
+Sin embargo, lo interesante del clústering es su poder de dividir los alumnos en `k` grupos característicos. En este caso, juzgando por las notas, podrían ser alumnos con ciertas características que los dividen en buenos, mediocres, y malos estudiantes. Si esto fuera así, podría ser interesante explorar qué ha pasado con el alumno en el clúster 3 que ha obtenido una nota final de 0.
+
+## Modelos supervisados
+
+### Regresión lineal
+
+Se puede utilizar regresión lineal para intentar predecir la variable $G3$ a partir de los datos.
+
+```{r, echo=False}
+lm_math <- select(math,-pass,-cluster,-cluster2) # eliminamos la variable pass (basada en G3) y las cluster obtenidas anteriormente
+
+linear_reg_model <- lm(G3 ~ .,data=lm_math)
+summary(linear_reg_model)
+```
+
+Como se puede ver a partir de los p-valores, las variables estadísticamente importantes a un 95% de confianza son `G2`, `absences`, `G1` y `famrel`, y al 90% `activities` y `age`. Un experimento más interesante puede ser intentar predecir la nota final a la mitad del curso, suponiendo que eso implica que se sabe la nota del primer periodo pero no del segundo:
+
+```{r, echo=False}
+lm_math2 <- select(lm_math,-G2)
+
+linear_reg_model2 <- lm(G3 ~ .,data=lm_math2)
+summary(linear_reg_model2)
+```
+
+Como se puede ver, esto reduce a 0.67 el R-squared ajustado, con nuevas variables con p-valor menor que 0.05: `romantic` y `schoolsup`. Si no se consideran ninguna de las dos notas:
+
+```{r, echo=False}
+lm_math3 <- select(lm_math2,-G1)
+
+linear_reg_model3 <- lm(G3 ~ .,data=lm_math3)
+summary(linear_reg_model3)
+```
+
+Como se puede apreciar, el fit del modelo a los datos ha caído en picado, con valores de R-squared ajustado de 0.2. Por tanto, sin acceso a las notas de los dos periodos, la regresión lineal no es apropiada para este problema. 
+
+Podemos observar las hipótesis del primer modelo:
+
+```{r}
+par(mfrow=c(2,2))
+plot(linear_reg_model)
+
+```
+
+En estos gráficos se observan ciertos valores extraños alrededor de las notas de 0, así como los residuos negativos. Se podría sospechar que dichos valores se corresponden a aquellos valores extraños que comentábamos en la exploración de variables. Los podemos eliminar y volver a analizar el modelo:
+
+```{r, echo=FALSE}
+
+lm_clean <- filter(math, G2 > 0) %>% select(-pass,-cluster,-cluster2)
+
+linear_reg_model_clean <- lm(G3 ~ .,data=lm_clean)
+summary(linear_reg_model_clean)
+```
+
+Se puede observar una reducción en el R-squared, y como la variable `G1` ha dejado de ser relevante. Observamos las hipótesis:
+
+```{r}
+par(mfrow=c(2,2))
+plot(linear_reg_model_clean)
+
+```
+
+Como se puede ver nuestra suposición estaba equivocada, ya que siguen exisistiendo residuos con falta de normalidad.
+
+Podemos tratar de eliminar valores de `G3` igual a cero:
+
+```{r, echo=FALSE}
+library(dplyr)
+math_no0 <- filter(math_clean,G3>0)
+
+lm_trans <- select(math_no0, -pass,-cluster,-cluster2)
+
+linear_reg_model_no0 <- lm(G3 ~ .,data=lm_trans)
+summary(linear_reg_model_no0)
+
+par(mfrow=c(2,2))
+plot(linear_reg_model_trans)
+```
+
+Como se puede observar, esto produce un muy buen R-squared además de corregir los errores en la falta de normalidad y heterocedasticidad.
+
+## Evaluación
