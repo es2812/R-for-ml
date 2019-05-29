@@ -5,10 +5,6 @@ date: "2 Junio, 2019"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
-
 ## Introducción
 
 En este infome se trata de exploar distintas técnicas de análisis sobre el dataset *student*, disponible en: https://archive.ics.uci.edu/ml/datasets/Student+Academics+Perfomance
@@ -98,6 +94,9 @@ Podemos ver que existen notas tanto iguales a 0 como a 20. Los cuartiles tambié
 Exploramos algunas posibles relaciones entre variables así como con la variable a predecir, `pass`. Por ejemplo `school` y `reason`:
 
 ```{r schoolvreason, result=FALSE}
+
+if(! "ggplot2" %in% installed.packages()) install.packages("ggplot2", depend = TRUE)
+
 library(ggplot2)
 
 ggplot(math,mapping=aes(x=school,fill=school)) +
@@ -134,8 +133,13 @@ ggplot(math) +
 Se pueden ver unos puntos que siguen una relación lineal, como era esperado, pero también algunos puntos que tienen valor de `G2` igual a 0, con valores de `G1` distribuidos. Podemos obtener a estos alumnos mediante un filtro:
 
 ```{r students with G2 0, result=FALSE}
+
+if(! "dplyr" %in% installed.packages()) install.packages("dplyr", depend = TRUE)
+if(! "knitr" %in% installed.packages()) install.packages("knitr", depend = TRUE)
+
 library(dplyr)
 library(knitr)
+library(rmarkdown)
 
 g2strange <- dplyr::filter(math,G2 == 0, G1 > 0)
 
@@ -203,7 +207,6 @@ Si que es posible apreciar cierto aumento del porcentaje de alumnos aprobados en
 También se pueden explorar algunas variables relacionadas con las familias de los alumnos, `famsize`, `Pstatus`, `Mjob`, `Fjob`, y `famrel`:
 
 ```{r families, result=FALSE}
-library(ggplot2)
 
 ggplot(math,mapping=aes(x=pass,fill=pass)) +
   geom_bar() +
@@ -232,8 +235,6 @@ ggplot(math,mapping=aes(x=Pstatus,fill=pass)) +
 También se exploran variables relacionadas con la ayuda al alumno, tanto por parte de la escuela `schoolsup`, como su familia `famsup`, como clases extraescolares `paid`:
 
 ```{r support, result=FALSE}
-library(ggplot2)
-
 ggplot(math,mapping=aes(x=pass,fill=pass)) +
   geom_bar() +
   facet_grid(schoolsup ~ famsup, labeller = label_both) +
@@ -253,8 +254,6 @@ Respecto a las variables relacionadas con la vida social de los alumnos con sus 
 
 
 ```{r social, result=FALSE}
-library(ggplot2)
-
 ggplot(math) +
   geom_bar( mapping=aes(x=goout, fill=pass ), position="dodge") +
   ggtitle("Fig 8.1. Número de alumnos aprobados y suspensos 
@@ -278,7 +277,6 @@ ggplot(math,mapping=aes(x=activities,fill=pass)) +
 Por último, se exploran otras variables, si la dirección en la que vive el alumno es rural o urbana `address` y si tiene acceso a `internet`:
 
 ```{r house, result=FALSE}
-library(ggplot2)
 
 ggplot(math,mapping=aes(x=internet,fill=pass)) + facet_wrap(~address) +
   geom_bar() +
@@ -306,6 +304,9 @@ Eliminamos las variables `pass` y `G3`, ya que estos modelos serán no supervisa
 La biblioteca `cluster` proporciona varios tipos de clustering. Probamos `clara`, que divide en k clusters y es útil para datasets grandes. 
 
 ```{r clara, echo=FALSE}
+
+if(! "cluster" %in% installed.packages()) install.packages("cluster", depend = TRUE)
+
 library(cluster)
 
 clusters <- clara(x, 2, samples = 100)
@@ -341,7 +342,6 @@ ggplot(math) +
 No se observa relación, aunque es interesante ver cómo todos los alumnos con nota final 0 están en el mismo cluster. Tratamos de crear 3 clústers, para ver si esos datos se separan completamente:
 
 ```{r clara3, echo=FALSE}
-library(cluster)
 
 clusters <- clara(x, 3, samples = 100)
 
@@ -424,8 +424,11 @@ Como se puede ver nuestra suposición estaba equivocada, ya que siguen exisistie
 Podemos tratar de eliminar valores de `G3` igual a cero:
 
 ```{r, echo=FALSE}
+
+if(! "dplyr" %in% installed.packages()) install.packages("dplyr", depend = TRUE)
+
 library(dplyr)
-math_no0 <- filter(math_clean,G3>0)
+math_no0 <- filter(math,G3>0)
 
 lm_trans <- select(math_no0, -pass,-cluster,-cluster2)
 
@@ -433,9 +436,28 @@ linear_reg_model_no0 <- lm(G3 ~ .,data=lm_trans)
 summary(linear_reg_model_no0)
 
 par(mfrow=c(2,2))
-plot(linear_reg_model_trans)
+plot(linear_reg_model_no0)
 ```
 
 Como se puede observar, esto produce un muy buen R-squared además de corregir los errores en la falta de normalidad y heterocedasticidad.
+
+### Decision Trees
+
+```{r}
+library(partykit)
+library(rpart)
+library(randomForest)
+
+math_for_tree <- select(math,-G3,-cluster,-cluster2)
+
+tree_model <- rpart(pass~.,data=math_for_tree)
+
+printcp(tree_model)
+summary(tree_model)
+
+plot(tree_model, uniform=TRUE, 
+   main="Árbol de clasficación")
+text(tree_model, use.n=TRUE, all=TRUE, cex=.8)
+```
 
 ## Evaluación
