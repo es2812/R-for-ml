@@ -1,15 +1,17 @@
 ---
 title: "R-for-ml"
-autho: "Esther Cuervo Fernández"
-date: "2 Junio, 2019"
-output: html_document
+date: "30 Mayo, 2019"
+output:
+  pdf_document: default
+  html_document: default
+author: Esther Cuervo Fernández
 ---
 
 ## Introducción
 
 En este infome se trata de exploar distintas técnicas de análisis sobre el dataset *student*, disponible en: https://archive.ics.uci.edu/ml/datasets/Student+Academics+Perfomance
 
-Este dataset contiene daas sobre estudiantes de dos asignaturas: Matemáticas y Potugués. Los campos del dataset son los siguientes:
+Este dataset contiene datos sobre estudiantes de dos asignaturas: Matemáticas y Potugués. Los campos del dataset son los siguientes:
 
 1. **school** - colegio del estudiante (binario: "GP" - Gabriel Pereira o "MS" - Mousinho da Silveira)
 2. **sex** - género del estudiante (binario: "F" - mujer o "M" - hombre)
@@ -52,21 +54,6 @@ Nuestro objetivo va a ser clasificar a los alumnos como aprobados o suspensos, c
 
 ### Lectura de datos
 
-Creamos un directorio para los datos y los leemos directamente de la url proporcionada
-
-```{r descarga, echo=TRUE}
-
-if (!file.exists("./data")) {
-        dir.create("./data")
-}
-
-fileURL <- "https://archive.ics.uci.edu/ml/machine-learning-databases/00320/student.zip"
-download.file(fileURL,destfile="./data/student.zip",method="curl")
-unzip("./data/student.zip", exdir="./data")
-list.files("./data")
-
-```
-
 Los datos están formados por dos tablas, una para cada asignatura. Nos quedamos con la de matemáticas:
 
 ```{r lectura, echo=TRUE}
@@ -76,10 +63,8 @@ math=read.table("./data/student-mat.csv",sep=";",header=TRUE)
 Creamos la variable a predecir, `pass`, binaria - "yes" para aprobados y "no" para suspensos:
 
 ```{r pass, echo=TRUE}
-math$pass <- ifelse(math$G3>=10, "yes", "no")
+math$pass <- as.factor(ifelse(math$G3>=10, "yes", "no"))
 ```
-
-## Summary
 
 Estadísticas para la variable original G3:
 
@@ -89,11 +74,11 @@ summary(math$G3)
 
 Podemos ver que existen notas tanto iguales a 0 como a 20. Los cuartiles también aportan información, por ejemplo que han aprobado algo más de un 50% de alumnos.
 
-### Exploración de variables
+## Exploración de variables
 
 Exploramos algunas posibles relaciones entre variables así como con la variable a predecir, `pass`. Por ejemplo `school` y `reason`:
 
-```{r schoolvreason, result=FALSE}
+```{r schoolvreason, echo=TRUE, message=FALSE}
 
 if(! "ggplot2" %in% installed.packages()) install.packages("ggplot2", depend = TRUE)
 
@@ -122,7 +107,7 @@ ggplot(math,mapping=aes(x=school, fill=reason)) +
 
 Otra relación interesante puede ser la de `G1` y `G2`, las notas del primer y segundo periodo:
 
-```{r G1vG2, result=FALSE}
+```{r G1vG2, echo=TRUE}
 ggplot(math) +
   geom_jitter(mapping=aes(x=G1, y=G2, color=pass),alpha=0.5) + 
   ggtitle("Fig 2: Nota del Periodo 2 contra Nota del Periodo 1 y aprobado") +
@@ -132,7 +117,7 @@ ggplot(math) +
 
 Se pueden ver unos puntos que siguen una relación lineal, como era esperado, pero también algunos puntos que tienen valor de `G2` igual a 0, con valores de `G1` distribuidos. Podemos obtener a estos alumnos mediante un filtro:
 
-```{r students with G2 0, result=FALSE}
+```{r students with G2 0, echo=TRUE, message=FALSE}
 
 if(! "dplyr" %in% installed.packages()) install.packages("dplyr", depend = TRUE)
 if(! "knitr" %in% installed.packages()) install.packages("knitr", depend = TRUE)
@@ -143,10 +128,11 @@ library(rmarkdown)
 
 g2strange <- dplyr::filter(math,G2 == 0, G1 > 0)
 
-kable(select(g2strange,"school","reason","age","higher","failures","traveltime","G1","G2","G3","pass"))
+kable(select(g2strange,"school","reason","age","higher","failures","traveltime","G1",
+             "G2","G3","pass"))
 ```
 
-Se puede observar que todos los alumnos son del mismo colegio, y que todos han obtenido una nota de 0 en `G3`. Especialmente curiosos son los alumnos que tenían notas de aprobado en `G2`. Una posible explicación son alumnos que han abandonado la clase antes del final del segundo periodo, y si el sistema educativo del país de origen de los datos es obligatorio sólo hasta la mayoría de edad, esto podría significar un abandono en el caso de los dos alumnos que no desean una educación superior, y ya tienen más de 18 años. También se puede observar que algunos de los alumnos tienen un número alto de suspensos anteriores.
+Se puede observar que todos los alumnos son del mismo colegio, y que todos han obtenido una nota de 0 en `G3`. Especialmente curiosos son los alumnos que tenían notas de aprobado en `G1`. Una posible explicación son alumnos que han abandonado la clase antes del final del segundo periodo, y si el sistema educativo del país de origen de los datos es obligatorio sólo hasta la mayoría de edad, esto podría significar un abandono en el caso de los dos alumnos que no desean una educación superior, y ya tienen más de 18 años. También se puede observar que algunos de los alumnos tienen un número alto de suspensos anteriores.
 
 En cualquier caso estos valores podrían ser outliers.
 
@@ -182,7 +168,8 @@ Otras variables como consumo de alcohol durante semana `Dalc` y fines de semana 
     
   geom_jitter(mapping = aes(x=Dalc, y=Walc,color=pass), alpha=0.5) +
   ggtitle("Fig 4.3. Relación entre consumo de alcohol 
-          en fines de semana y entre semana y nota") + xlab("Alcohol consumido entre semana") +
+          en fines de semana y entre semana y nota") + 
+    xlab("Alcohol consumido entre semana") +
     ylab("Alcohol consumido en fines de semana")
 
 ``` 
@@ -211,7 +198,8 @@ También se pueden explorar algunas variables relacionadas con las familias de l
 ggplot(math,mapping=aes(x=pass,fill=pass)) +
   geom_bar() +
   facet_grid(famsize ~ famrel, labeller = label_both) +
-  ggtitle("Fig 6.1. Número de alumnos aprobados y suspensos por tamaño de familiia y relación con la familia")
+  ggtitle("Fig 6.1. Número de alumnos aprobados y suspensos por 
+          tamaño de familiia y relación con la familia")
 
 ggplot(math,mapping=aes(x=pass,fill=factor(Mjob))) +
   geom_bar(position="dodge") +
@@ -228,7 +216,7 @@ ggplot(math,mapping=aes(x=Pstatus,fill=pass)) +
 
 ```
 
-- Fig 6.1. muestra que las familias de más de tres miembros son mucho más comunes, y que las relaciones de clidad 4 (buenas) son más comunes en ambos tamaños. 
+- Fig 6.1. muestra que las familias de más de tres miembros son mucho más comunes, y que las relaciones de calidad 4 (buenas) son más comunes en ambos tamaños. 
 - Fig 6.2. y 6.3. muestran que los trabajos más comunes son `other`, podría ser interesante  ver el desglose de estos trabajos. 
 - En la Fig 6.4. se aprecia que lo más común son padres juntos, y no se observa una diferencia grande de distribución de aprobados por esta variable.
 
@@ -247,7 +235,7 @@ ggplot(math,mapping=aes(x=paid,fill=pass)) +
 
 ```
 
-- Fig 7.1. muestra que muy pocos alumnos reciben ayuda del colegio, y entre aquellos que la reciben no parece afectar al resultado. Respecto a la ayuda familiar, la mayoría de alumnos la tienen, pero tampoco parece resultar en una clara diferencia en aprobados.
+- Fig 7.1. muestra que muy pocos alumnos reciben ayuda del colegio, y entre aquellos que la reciben no parece mejorar el resultado, y de hecho parece haber un número de suspensos y aprobados similar. Respecto a la ayuda familiar, la mayoría de alumnos la tienen, pero tampoco parece resultar en una clara diferencia en aprobados.
 - En Fig 7.2. se observa que las clases particulares si que parecen reducir el número de suspensos.
 
 Respecto a las variables relacionadas con la vida social de los alumnos con sus notas, existen las variables `romantic`, `goout` y `activities`:
@@ -261,7 +249,8 @@ ggplot(math) +
 
 ggplot(math,mapping=aes(x=romantic,fill=pass)) +
   geom_bar(position="dodge") +
-  ggtitle("Fig 8.2. Número de aprobados y suspensos según si el alumno tiene pareja")
+  ggtitle("Fig 8.2. Número de aprobados y suspensos según si el 
+          alumno tiene pareja")
 
 ggplot(math,mapping=aes(x=activities,fill=pass)) +
   geom_bar(position="dodge") +
@@ -285,7 +274,8 @@ ggplot(math,mapping=aes(x=internet,fill=pass)) + facet_wrap(~address) +
 
 ggplot(math,mapping=aes(x=internet,fill=pass)) +
   geom_bar(position="fill") +
-  ggtitle("Fig 9.2. Proporción de aprobados y suspensos según si tiene acceso a internet") +
+  ggtitle("Fig 9.2. Proporción de aprobados y suspensos según si tiene acceso a 
+          internet") +
   ylab("% alumnos")
 ```
 
@@ -295,17 +285,15 @@ ggplot(math,mapping=aes(x=internet,fill=pass)) +
 
 ## Modelos no supervisados
 
-Eliminamos las variables `pass` y `G3`, ya que estos modelos serán no supervisados. También eliminamos los NaN:
+Eliminamos las variables `pass` y `G3`, ya que estos modelos serán no supervisados.
 
-```{r transform, echo=FALSE}
+```{r transform, echo=TRUE}
   x <- select(math, -pass, -G3)
 ```
 
 La biblioteca `cluster` proporciona varios tipos de clustering. Probamos `clara`, que divide en k clusters y es útil para datasets grandes. 
 
-```{r clara, echo=FALSE}
-
-if(! "cluster" %in% installed.packages()) install.packages("cluster", depend = TRUE)
+```{r clara, echo=TRUE, message=FALSE}
 
 library(cluster)
 
@@ -318,7 +306,7 @@ math$cluster <- clusters$clustering
 
 Podemos comprobar si la separación en clusters se parece a las clases asignadas:
 
-```{r clara2, echo=FALSE}
+```{r clara2, echo=TRUE, message=FALSE}
 
 library(caret)
 
@@ -333,7 +321,7 @@ confusionMatrix(xtab1)
 
 Como podemos ver, casi un 60% de las instancias se clasifican correctamente simplemente utilizando clustering. Podemos representar los clusters contra la nota `G3`, para ver si existe alguna relación:
 
-```{r clustersvg3, echo=FALSE}
+```{r clustersvg3, echo=TRUE}
 
 ggplot(math) + 
   geom_jitter(mapping=aes(x=cluster,y=G3,color=factor(pass)))
@@ -341,7 +329,7 @@ ggplot(math) +
 
 No se observa relación, aunque es interesante ver cómo todos los alumnos con nota final 0 están en el mismo cluster. Tratamos de crear 3 clústers, para ver si esos datos se separan completamente:
 
-```{r clara3, echo=FALSE}
+```{r clara3, echo=TRUE}
 
 clusters <- clara(x, 3, samples = 100)
 
@@ -350,7 +338,7 @@ math$cluster2 <- clusters$clustering
 
 ```
 
-```{r clustersvg2, echo=FALSE}
+```{r clustersvg2, echo=TRUE}
 
 ggplot(math) + 
   geom_jitter(mapping=aes(x=cluster2,y=G3,color=factor(pass)))
@@ -364,10 +352,12 @@ Sin embargo, lo interesante del clústering es su poder de dividir los alumnos e
 
 ### Regresión lineal
 
-Se puede utilizar regresión lineal para intentar predecir la variable $G3$ a partir de los datos.
+Se puede utilizar regresión lineal para intentar predecir la variable `G3` a partir de los datos.
 
-```{r, echo=False}
-lm_math <- select(math,-pass,-cluster,-cluster2) # eliminamos la variable pass (basada en G3) y las cluster obtenidas anteriormente
+```{r echo=TRUE, message=FALSE}
+
+# eliminamos la variable pass (basada en G3) y las cluster obtenidas anteriormente
+lm_math <- select(math,-pass,-cluster,-cluster2) 
 
 linear_reg_model <- lm(G3 ~ .,data=lm_math)
 summary(linear_reg_model)
@@ -375,7 +365,7 @@ summary(linear_reg_model)
 
 Como se puede ver a partir de los p-valores, las variables estadísticamente importantes a un 95% de confianza son `G2`, `absences`, `G1` y `famrel`, y al 90% `activities` y `age`. Un experimento más interesante puede ser intentar predecir la nota final a la mitad del curso, suponiendo que eso implica que se sabe la nota del primer periodo pero no del segundo:
 
-```{r, echo=False}
+```{r, echo=TRUE}
 lm_math2 <- select(lm_math,-G2)
 
 linear_reg_model2 <- lm(G3 ~ .,data=lm_math2)
@@ -384,7 +374,7 @@ summary(linear_reg_model2)
 
 Como se puede ver, esto reduce a 0.67 el R-squared ajustado, con nuevas variables con p-valor menor que 0.05: `romantic` y `schoolsup`. Si no se consideran ninguna de las dos notas:
 
-```{r, echo=False}
+```{r, echo=TRUE}
 lm_math3 <- select(lm_math2,-G1)
 
 linear_reg_model3 <- lm(G3 ~ .,data=lm_math3)
@@ -403,7 +393,7 @@ plot(linear_reg_model)
 
 En estos gráficos se observan ciertos valores extraños alrededor de las notas de 0, así como los residuos negativos. Se podría sospechar que dichos valores se corresponden a aquellos valores extraños que comentábamos en la exploración de variables. Los podemos eliminar y volver a analizar el modelo:
 
-```{r, echo=FALSE}
+```{r, echo=TRUE}
 
 lm_clean <- filter(math, G2 > 0) %>% select(-pass,-cluster,-cluster2)
 
@@ -423,11 +413,8 @@ Como se puede ver nuestra suposición estaba equivocada, ya que siguen exisistie
 
 Podemos tratar de eliminar valores de `G3` igual a cero:
 
-```{r, echo=FALSE}
+```{r, echo=TRUE}
 
-if(! "dplyr" %in% installed.packages()) install.packages("dplyr", depend = TRUE)
-
-library(dplyr)
 math_no0 <- filter(math,G3>0)
 
 lm_trans <- select(math_no0, -pass,-cluster,-cluster2)
@@ -443,21 +430,79 @@ Como se puede observar, esto produce un muy buen R-squared además de corregir l
 
 ### Decision Trees
 
-```{r}
-library(partykit)
-library(rpart)
-library(randomForest)
 
-math_for_tree <- select(math,-G3,-cluster,-cluster2)
+```{r, message=FALSE}
 
-tree_model <- rpart(pass~.,data=math_for_tree)
+math_for_tree <- select(math,-G3)
 
-printcp(tree_model)
-summary(tree_model)
+#la clase debe ser de tipo factor para utilizar ctree
+math_for_tree$pass <- as.factor(math_for_tree$pass) 
 
-plot(tree_model, uniform=TRUE, 
-   main="Árbol de clasficación")
-text(tree_model, use.n=TRUE, all=TRUE, cex=.8)
+
+set.seed(12345)
+train_idx <- sample(1:395,size=(300),replace=F)
+train_math <- math_for_tree[train_idx,]
+test_math <- math_for_tree[-train_idx,]
+
+summary(train_math)
+
 ```
 
-## Evaluación
+```{r, message=FALSE}
+
+library(partykit)
+
+tree_model <- ctree(pass ~ ., data=train_math)
+
+# Árbol:
+print(tree_model)
+
+```
+```{r}
+
+plot(tree_model)
+
+```
+
+Como se puede ver, sólo se ha utilizado la variable `G2` para elegir, partiendo simplemente en el valor de 9 y por tanto asignando "no" a los alumnos suspensos en el segundo periodo y "sí" a los alumnos aprobados. Respecto al conjunto de test, se obtiene la siguiente predicción:
+
+```{r}
+
+pred <- predict(tree_model, newdata = test_math)
+table(pred, test_math$pass)
+
+```
+
+Como se puede observar el modelo sólo se equivoca en 7 instancias de 95 para el conjunto de test, y sólo en alumnos aprobados, predichos como suspensos.
+
+Probamos un último modelo en el que no utilizamos `G2`:
+
+```{r, message=FALSE}
+
+tree_model2 <- ctree(pass ~ ., data=select(train_math,-G2))
+
+# Árbol:
+print(tree_model2)
+
+
+plot(tree_model2)
+
+```
+
+Esta vez entran en juego las variables `G1`, `goout` y uno de los clusterizados realizados anteriormente, que separaba las instancias en tres conjuntos.
+
+```{r}
+
+pred <- predict(tree_model2, newdata = test_math)
+table(pred, test_math$pass)
+
+```
+
+Como se puede observar, este modelo sigue clasificando 7 instancias con valor real aprobado como no aprobado, pero esta vez también asigna a 14 alumnos suspensos una predicción de aprobados.
+
+
+## Conclusiones
+
+Como resumen del trabajo elaborado, se han explorado las variables del dataset `math`, encontrando ciertas relaciones interesantes entre variables. Respecto a la utilización de clústering, se han conseguido tres clústers con características potencialmente interesantes para separar a los alumnos con cierta relación con su nota final. Por último, los modelos supervisados han resultado en un modelo problemático en el caso de regresión lineal, y un modelo muy simple y relativamente efectivo en términos de la tasa de error en test.
+
+Cabe la pena mencionar que en todos los casos se ha hecho obvia la importancia de las variables `G1`, y especialmente `G2` para predecir el aprobado o suspenso de un alumno. Sería de gran interés por tanto conseguir un modelo que clasifique de manera decente el dataset utilizando el resto de características.
